@@ -104,6 +104,12 @@ class ElectronPermissionManager : public content::PermissionControllerDelegate {
                              const base::Value* object,
                              content::RenderFrameHost* render_frame_host) const;
 
+  void RevokeDevicePermission(
+      content::PermissionType permission,
+      const url::Origin& origin,
+      const base::Value* object,
+      content::RenderFrameHost* render_frame_host) const;
+
  protected:
   void OnPermissionResponse(int request_id,
                             int permission_id,

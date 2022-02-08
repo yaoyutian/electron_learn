@@ -48,6 +48,7 @@
 #include "content/public/browser/navigation_details.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/permission_type.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -3450,37 +3451,116 @@ v8::Local<v8::Promise> WebContents::TakeHeapSnapshot(
 void WebContents::GrantDevicePermission(
     const url::Origin& origin,
     const base::Value* device,
-    content::PermissionType permissionType,
+    content::PermissionType permission_type,
     content::RenderFrameHost* render_frame_host) {
-  granted_devices_[render_frame_host->GetFrameTreeNodeId()][permissionType]
+  granted_devices_[render_frame_host->GetFrameTreeNodeId()][permission_type]
                   [origin]
                       .push_back(
                           std::make_unique<base::Value>(device->Clone()));
 }
 
-std::vector<base::Value> WebContents::GetGrantedDevices(
+void WebContents::RevokeDevicePermission(
     const url::Origin& origin,
-    content::PermissionType permissionType,
+    const base::Value* device,
+    content::PermissionType permission_type,
     content::RenderFrameHost* render_frame_host) {
   const auto& devices_for_frame_host_it =
       granted_devices_.find(render_frame_host->GetFrameTreeNodeId());
   if (devices_for_frame_host_it == granted_devices_.end())
-    return {};
+    return;
 
   const auto& current_devices_it =
-      devices_for_frame_host_it->second.find(permissionType);
+      devices_for_frame_host_it->second.find(permission_type);
   if (current_devices_it == devices_for_frame_host_it->second.end())
-    return {};
+    return;
 
   const auto& origin_devices_it = current_devices_it->second.find(origin);
   if (origin_devices_it == current_devices_it->second.end())
-    return {};
+    return;
 
-  std::vector<base::Value> results;
-  for (const auto& object : origin_devices_it->second)
-    results.push_back(object->Clone());
+  for (auto it = origin_devices_it->second.begin();
+       it != origin_devices_it->second.end(); ++it) {
+    if (DoesDeviceMatch(device, it->get(), permission_type)) {
+      origin_devices_it->second.erase(it);
+    }
+  }
+}
 
-  return results;
+bool WebContents::DoesDeviceMatch(const base::Value* device,
+                                  const base::Value* device_to_compare,
+                                  content::PermissionType permission_type) {
+  if (permission_type ==
+      static_cast<content::PermissionType>(
+          WebContentsPermissionHelper::PermissionType::HID)) {
+    if (device->FindIntKey(kHidVendorIdKey) !=
+            device_to_compare->FindIntKey(kHidVendorIdKey) ||
+        device->FindIntKey(kHidProductIdKey) !=
+            device_to_compare->FindIntKey(kHidProductIdKey)) {
+      return false;
+    }
+
+    const auto* serial_number =
+        device_to_compare->FindStringKey(kHidSerialNumberKey);
+    const auto* device_serial_number =
+        device->FindStringKey(kHidSerialNumberKey);
+
+    if (serial_number && device_serial_number &&
+        *device_serial_number == *serial_number)
+      return true;
+  } else if (permission_type ==
+             static_cast<content::PermissionType>(
+                 WebContentsPermissionHelper::PermissionType::SERIAL)) {
+#if BUILDFLAG(IS_WIN)
+    if (device->FindStringKey(kDeviceInstanceIdKey) ==
+        device_to_compare->FindStringKey(kDeviceInstanceIdKey))
+      return true;
+#else
+    if (device->FindIntKey(kVendorIdKey) !=
+            device_to_compare->FindIntKey(kVendorIdKey) ||
+        device->FindIntKey(kProductIdKey) !=
+            device_to_compare->FindIntKey(kProductIdKey) ||
+        *device->FindStringKey(kSerialNumberKey) !=
+            *device_to_compare->FindStringKey(kSerialNumberKey)) {
+      return false;
+    }
+
+#if BUILDFLAG(IS_MAC)
+    if (*device->FindStringKey(kUsbDriverKey) !=
+        *device_to_compare->FindStringKey(kUsbDriverKey)) {
+      return false;
+    }
+#endif  // BUILDFLAG(IS_MAC)
+    return true;
+#endif  // BUILDFLAG(IS_WIN)
+  }
+  return false;
+}
+
+bool WebContents::CheckDevicePermission(
+    const url::Origin& origin,
+    const base::Value* device,
+    content::PermissionType permission_type,
+    content::RenderFrameHost* render_frame_host) {
+  const auto& devices_for_frame_host_it =
+      granted_devices_.find(render_frame_host->GetFrameTreeNodeId());
+  if (devices_for_frame_host_it == granted_devices_.end())
+    return false;
+
+  const auto& current_devices_it =
+      devices_for_frame_host_it->second.find(permission_type);
+  if (current_devices_it == devices_for_frame_host_it->second.end())
+    return false;
+
+  const auto& origin_devices_it = current_devices_it->second.find(origin);
+  if (origin_devices_it == current_devices_it->second.end())
+    return false;
+
+  for (const auto& device_to_compare : origin_devices_it->second) {
+    if (DoesDeviceMatch(device, device_to_compare.get(), permission_type))
+      return true;
+  }
+
+  return false;
 }
 
 void WebContents::UpdatePreferredSize(content::WebContents* web_contents,
