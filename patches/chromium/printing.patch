@@ -498,20 +498,21 @@ index 10f46664d8337d6be2fac24d9a6933429f3b2c2b..6de833f2da3ae85cf0752284146974f2
    void SetPrintPreviewUI(
        mojo::PendingAssociatedRemote<mojom::PrintPreviewUI> preview) override;
 diff --git a/components/printing/browser/print_to_pdf/pdf_print_manager.cc b/components/printing/browser/print_to_pdf/pdf_print_manager.cc
-index 66810a2a5f0c77ba107c71d2abaef8692bda0fea..cd6103af4571f82f11652a3c7ecf0e534428dc49 100644
+index 66810a2a5f0c77ba107c71d2abaef8692bda0fea..4720eae188f8744555794622b38734485258a3b9 100644
 --- a/components/printing/browser/print_to_pdf/pdf_print_manager.cc
 +++ b/components/printing/browser/print_to_pdf/pdf_print_manager.cc
-@@ -116,7 +116,8 @@ void PdfPrintManager::PrintToPdf(
+@@ -116,7 +116,9 @@ void PdfPrintManager::PrintToPdf(
    set_cookie(print_pages_params_->params->document_cookie);
    callback_ = std::move(callback);
  
 -  GetPrintRenderFrame(rfh)->PrintRequestedPages();
 +  // TODO(electron-maintainers): do something with job_settings here?
-+  GetPrintRenderFrame(rfh)->PrintRequestedPages(true/*silent*/, base::Value{}/*job_settings*/);
++  base::Value dict(base::Value::Type::DICTIONARY);
++  GetPrintRenderFrame(rfh)->PrintRequestedPages(true/*silent*/, std::move(dict)/*job_settings*/);
  }
  
  void PdfPrintManager::GetDefaultPrintSettings(
-@@ -138,14 +139,14 @@ void PdfPrintManager::ScriptedPrint(
+@@ -138,14 +140,14 @@ void PdfPrintManager::ScriptedPrint(
    if (!printing_rfh_) {
      DLOG(ERROR) << "Unexpected message received before PrintToPdf is "
                     "called: ScriptedPrint";
@@ -528,7 +529,7 @@ index 66810a2a5f0c77ba107c71d2abaef8692bda0fea..cd6103af4571f82f11652a3c7ecf0e53
      return;
    }
    absl::variant<printing::PageRanges, PageRangeError> page_ranges =
-@@ -162,7 +163,7 @@ void PdfPrintManager::ScriptedPrint(
+@@ -162,7 +164,7 @@ void PdfPrintManager::ScriptedPrint(
          break;
      }
      ReleaseJob(print_result);
@@ -537,7 +538,7 @@ index 66810a2a5f0c77ba107c71d2abaef8692bda0fea..cd6103af4571f82f11652a3c7ecf0e53
      return;
    }
  
-@@ -170,7 +171,7 @@ void PdfPrintManager::ScriptedPrint(
+@@ -170,7 +172,7 @@ void PdfPrintManager::ScriptedPrint(
    print_pages_params_->pages = printing::PageRange::GetPages(
        absl::get<printing::PageRanges>(page_ranges));
  
