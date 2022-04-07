@@ -508,7 +508,7 @@ index 66810a2a5f0c77ba107c71d2abaef8692bda0fea..4720eae188f8744555794622b3873448
 -  GetPrintRenderFrame(rfh)->PrintRequestedPages();
 +  // TODO(electron-maintainers): do something with job_settings here?
 +  base::Value dict(base::Value::Type::DICTIONARY);
-+  GetPrintRenderFrame(rfh)->PrintRequestedPages(true/*silent*/, std::move(dict)/*job_settings*/);
++  GetPrintRenderFrame(rfh)->PrintRequestedPages(false, std::move(dict));
  }
  
  void PdfPrintManager::GetDefaultPrintSettings(

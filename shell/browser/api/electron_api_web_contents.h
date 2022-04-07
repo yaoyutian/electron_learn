@@ -95,9 +95,7 @@ class OffScreenWebContentsView;
 
 namespace api {
 
-using PrintToPDFCallback =
-    base::OnceCallback<void(print_to_pdf::PdfPrintManager::PrintResult,
-                            scoped_refptr<base::RefCountedMemory>)>;
+using PrintingCompletionCallback = base::OnceCallback<void(bool, const std::string&)>;
 
 using DevicePermissionMap = std::map<
     int,
@@ -227,7 +225,7 @@ class WebContents : public ExclusiveAccessContext,
 
 #if BUILDFLAG(ENABLE_PRINTING)
   void OnGetDefaultPrinter(base::Value print_settings,
-                           printing::CompletionCallback print_callback,
+                           PrintingCompletionCallback print_callback,
                            std::u16string device_name,
                            bool silent,
                            // <error, default_printer_name>
@@ -237,7 +235,7 @@ class WebContents : public ExclusiveAccessContext,
   v8::Local<v8::Promise> PrintToPDF(base::DictionaryValue settings);
   void OnPDFCreated(
     gin_helper::Promise<v8::Local<v8::Value>> promise,
-    print_to_pdf::PdfPrintManager::PrintResult print_result,
+    PrintViewManagerElectron::PrintResult print_result,
     scoped_refptr<base::RefCountedMemory> data);
 #endif
 
