@@ -94,9 +94,6 @@ class OffScreenWebContentsView;
 
 namespace api {
 
-using PrintingCompletionCallback =
-    base::OnceCallback<void(bool, const std::string&)>;
-
 using DevicePermissionMap = std::map<
     int,
     std::map<content::PermissionType,
@@ -225,7 +222,7 @@ class WebContents : public ExclusiveAccessContext,
 
 #if BUILDFLAG(ENABLE_PRINTING)
   void OnGetDefaultPrinter(base::Value print_settings,
-                           PrintingCompletionCallback print_callback,
+                           printing::CompletionCallback print_callback,
                            std::u16string device_name,
                            bool silent,
                            // <error, default_printer_name>
