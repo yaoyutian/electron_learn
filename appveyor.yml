@@ -121,7 +121,7 @@ build_script:
   - ninja -C out/Default electron:electron_chromedriver_zip
   - ninja -C out/Default third_party/electron_node:headers
   - python %LOCAL_GOMA_DIR%\goma_ctl.py stat
-  - echo "Logging DEPOT_TOOLS_WIN_TOOLCHAIN $env:DEPOT_TOOLS_WIN_TOOLCHAIN"
+  - set DEPOT_TOOLS_WIN_TOOLCHAIN=0
   - python electron/build/profile_toolchain.py --output-json=out/Default/windows_toolchain_profile.json
   - 7z a node_headers.zip out\Default\gen\node_headers
   # Temporarily disable symbol generation on 32-bit Windows due to failures  
