@@ -2,10 +2,8 @@ import { expect } from 'chai';
 import * as childProcess from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as qs from 'querystring';
 import * as http from 'http';
-import * as semver from 'semver';
 import { AddressInfo } from 'net';
 import { app, BrowserWindow, BrowserView, dialog, ipcMain, OnBeforeSendHeadersListenerDetails, protocol, screen, webContents, session, WebContents, BrowserWindowConstructorOptions } from 'electron/main';
 
@@ -2128,7 +2126,7 @@ describe('BrowserWindow module', () => {
     });
   });
 
-  ifdescribe(process.platform === 'win32' || (process.platform === 'darwin' && semver.gte(os.release(), '14.0.0')))('"titleBarStyle" option', () => {
+  ifdescribe(['win32', 'darwin'].includes(process.platform))('"titleBarStyle" option', () => {
     const testWindowsOverlay = async (style: any) => {
       const w = new BrowserWindow({
         show: false,
@@ -2197,7 +2195,7 @@ describe('BrowserWindow module', () => {
     });
   });
 
-  ifdescribe(process.platform === 'win32' || (process.platform === 'darwin' && semver.gte(os.release(), '14.0.0')))('"titleBarOverlay" option', () => {
+  ifdescribe(['win32', 'darwin'].includes(process.platform))('"titleBarOverlay" option', () => {
     const testWindowsOverlayHeight = async (size: any) => {
       const w = new BrowserWindow({
         show: false,
@@ -2244,6 +2242,72 @@ describe('BrowserWindow module', () => {
     afterEach(() => { ipcMain.removeAllListeners('geometrychange'); });
     it('sets Window Control Overlay with title bar height of 40', async () => {
       await testWindowsOverlayHeight(40);
+    });
+  });
+
+  ifdescribe(process.platform === 'win32')('BrowserWindow.setTitlebarOverlay', () => {
+    afterEach(closeAllWindows);
+    afterEach(() => { ipcMain.removeAllListeners('geometrychange'); });
+
+    it('does not crash when an invalid titleBarStyle was initially set', () => {
+      const win = new BrowserWindow({
+        titleBarOverlay: {
+          color: '#0000f0',
+          symbolColor: '#ffffff'
+        },
+        titleBarStyle: 'hiddenInset'
+      });
+
+      expect(() => {
+        win.setTitleBarOverlay({
+          color: '#000000'
+        });
+      }).to.not.throw();
+    });
+
+    it('correctly updates the height of the overlay', async () => {
+      const testOverlay = async (w: BrowserWindow, size: Number) => {
+        const overlayHTML = path.join(__dirname, 'fixtures', 'pages', 'overlay.html');
+        const overlayReady = emittedOnce(ipcMain, 'geometrychange');
+        await w.loadFile(overlayHTML);
+        await overlayReady;
+        const overlayEnabled = await w.webContents.executeJavaScript('navigator.windowControlsOverlay.visible');
+        expect(overlayEnabled).to.be.true('overlayEnabled');
+        const overlayRectPreMax = await w.webContents.executeJavaScript('getJSOverlayProperties()');
+        await w.maximize();
+        const max = await w.isMaximized();
+        expect(max).to.equal(true);
+        const overlayRectPostMax = await w.webContents.executeJavaScript('getJSOverlayProperties()');
+
+        expect(overlayRectPreMax.y).to.equal(0);
+        expect(overlayRectPreMax.x).to.equal(0);
+        expect(overlayRectPreMax.width).to.be.greaterThan(0);
+        expect(overlayRectPreMax.height).to.equal(size);
+        expect(overlayRectPostMax.height).to.equal(size);
+      };
+
+      const INITIAL_SIZE = 40;
+      const w = new BrowserWindow({
+        show: false,
+        width: 400,
+        height: 400,
+        titleBarStyle: 'hidden',
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        },
+        titleBarOverlay: {
+          height: INITIAL_SIZE
+        }
+      });
+
+      await testOverlay(w, INITIAL_SIZE);
+
+      w.setTitleBarOverlay({
+        height: INITIAL_SIZE + 10
+      });
+
+      await testOverlay(w, INITIAL_SIZE + 10);
     });
   });
 
